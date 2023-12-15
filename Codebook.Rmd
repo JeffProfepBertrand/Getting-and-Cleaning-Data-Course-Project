@@ -1,0 +1,162 @@
+---
+title: "Codebook - Getting and Cleaning Data Course Project"
+author: "Me"
+date: "2023-12-13"
+output: html_document
+---
+
+Step 1: Download the data.
+
+The data required for this project have been previously downloaded from provided link and unzipped on drive.
+The working folder has been set, but is not shown here for privacy purpose.
+The data lies in "UCI HAR Dataset" folder
+
+Step 2: Load 2 libraries needed for this project
+
+```{r message=FALSE, warning=FALSE}
+library(data.table)
+library(dplyr)
+```
+
+Step 3: Read the files into data frames. 
+
+          ##  From Readme file, the dataset includes the following files:
+          ## 'features_info.txt'- Shows information about the variables used on the feature vector - needed to understand files structures
+          ## 'features.txt'- the complete list of variables of each feature vector - this has to be used when reading test and training files.
+          ## 'activity_labels.txt': Links the class labels with their activity name.
+          ## 'train/X_train.txt': Training set using names from function used.
+          ## 'train/y_train.txt': Training labels using category names.
+          ## 'test/X_test.txt': Test set function using names from function used.
+          ## 'test/y_test.txt': Test labels using category names.
+          ## 'train/subject_train.txt': Each row identifies the subject who performed the activity for each window sample. Its range is from 1 to 30. 
+
+```{r message=FALSE, warning=FALSE}
+features <- read.table("data/UCI HAR Dataset/features.txt", col.names = c("n","functions"))
+activity_labels <- read.table("data/UCI HAR Dataset/activity_labels.txt", col.names = c("category", "activity"))
+x_train <- read.table("data/UCI HAR Dataset/train/X_train.txt", col.names = features$functions)
+y_train <- read.table("data/UCI HAR Dataset/train/y_train.txt", col.names = "category")
+x_test <- read.table("data/UCI HAR Dataset/test/X_test.txt", col.names = features$functions)
+y_test <- read.table("data/UCI HAR Dataset/test/y_test.txt", col.names = "category")
+subject_train <- read.table("data/UCI HAR Dataset/train/subject_train.txt", col.names = "subject")
+subject_test <- read.table("data/UCI HAR Dataset/test/subject_test.txt", col.names = "subject")
+```
+
+```{r echo=TRUE}
+str(features)
+str(activity_labels)
+str(x_train)
+str(y_train)
+str(x_test)
+str(y_test)
+str(subject_train)
+str(subject_test)
+```
+
+Step 4: Verify if there are duplicates subjects in train and test (as a precaution)
+
+```{r message=FALSE, warning=FALSE}
+unique_train <- unique(subject_train)
+unique_test <- unique(subject_test)
+unique <- rbind(unique_test,unique_train)
+if (sum(duplicated(unique)) != 0){
+  break
+}
+```
+
+Step 5: Merges the training and the test sets to create one data set
+
+```{r message=TRUE, warning=FALSE, paged.print=TRUE}
+## Before merging train and test data set needs to put subject id and category of test with whose file - using cbind
+train <- cbind(subject_train,y_train,x_train)
+test <- cbind(subject_test,y_test,x_test)
+
+## full data using rbind
+data <- rbind(train, test)
+```
+
+```{r echo=TRUE}
+str(data)
+```
+
+Step 6: Create smaller data set and tidy data
+
+```{r message=FALSE, warning=FALSE}
+## Extracts only the measurements on the mean and standard deviation for each measurement. 
+##data <- data[, grep("subject|category|mean|std", names(data))]
+data <- data %>% select(subject, category, contains("mean"), contains("std"))
+
+## Creating factor variable for category
+data$category <- as.factor(data$category)
+```
+
+```{r echo=TRUE}
+str(data)
+```
+
+Step 7: Uses descriptive activity names to name the activities in the data set
+
+```{r message=FALSE, warning=FALSE}
+data$category <- factor(data$category, labels = activity_labels$activity)
+
+## change variable name from category to activity 
+names(data)[2] <- "activity"
+```
+
+Step 8: Appropriately labels the data set with descriptive variable names
+
+```{r message=FALSE, warning=FALSE}
+## label data with descriptive names 
+names(data)<-gsub("Acc", "_Accelerometer", names(data))
+names(data)<-gsub("Gyro", "_Gyroscope", names(data))
+names(data)<-gsub("Mag", "_Magnitude", names(data))
+names(data)<-gsub("angle", "_Angle", names(data))
+names(data)<-gsub("gravity", "_Gravity", names(data))
+names(data)<-gsub("Jerk", "_Jerk", names(data))
+
+## weird data name
+names(data)<-gsub("BodyBody", "Body", names(data))
+
+## Removes dot.
+names(data) <- gsub("\\.", "", names(data))
+
+## metrics
+names(data)<-gsub("mean", "_Mean_", names(data))
+names(data)<-gsub("std", "_Standard_deviation_", names(data))
+names(data)<-gsub("Freq", "_Frequency_", names(data))
+
+## Change start of variables names
+names(data)<-gsub("^t", "Time_", names(data))
+names(data)<-gsub("^f", "Frequency_", names(data))
+
+## Remove leading _
+names(data)<-gsub("_$", "", names(data))
+
+## Fix this
+names(data)<-gsub("Mean__Frequency", "Mean_Frequency", names(data))
+
+```
+
+
+```{r echo=TRUE}
+str(data)
+```
+
+
+Step 9: Creates a second, independent tidy data set with the average of each variable for each activity and each subject.
+
+```{r message=FALSE, warning=FALSE}
+          final_data <- data %>% group_by(subject, activity) %>% summarise_all(mean)
+```
+
+Step 10: Check structure of file
+
+```{r echo=TRUE}
+str(final_data)
+```
+
+Step 11: Write the tidy table into a text file 
+
+```{r message=FALSE, warning=FALSE}
+write.table(final_data, "./data/final_data.txt", row.name=FALSE)
+```
+
